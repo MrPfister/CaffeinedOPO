@@ -52,10 +52,12 @@ var exe = function(b) {
     var fO = p.f;
     wO(' - Offset: ' + p.f);
     
+	// Source location is ignored.
+	
     pT+= 6;
     
     // Retrieve the information about the Procedure
-    if (this.t == 4383) {
+    if (this.t >= 4383) {
       // Translater version $111F and above only
       fO += 2;
     }
@@ -136,7 +138,6 @@ var exe = function(b) {
     
     // Called Procedure Start Offset
     p.cp = [];
-    var cpso = 18 + p.gs;
     var cpT = fO;
     if (p.cps != 0) {
 		// Process procedures that are called
@@ -154,11 +155,7 @@ var exe = function(b) {
 		  // Arguments
 		  cpe.a = b[fO + 1 + b[fO]];
     	  wO(' - Arguments: ' + cpe.a);
-		  
-		  // Offset
-		  cpe.o = cpso + fO - cpT;
-    	  wO(' - Offset: ' + cpe.o);
-		  
+		  		  
 		  // Add the called procedure references to the procedure body
 		  p.cp.push(cpe);
 		  
@@ -170,9 +167,7 @@ var exe = function(b) {
     p.gr = [];
     
     // Store the Global Reference Offset
-    var go = 18 + p.cps;
     wO('Global References');
-    wO(' - Global Reference Offset: ' + go);
     
     // The global references section ends in a 0 byte
     while (b[fO] != 0) {
@@ -188,14 +183,9 @@ var exe = function(b) {
       grce.t = b[fO + 1 + b[fO]];
       wO(' - Typecode: ' + grce.t);
       
-      // Offset
-      grce.o = go;
-      wO(' - Offset: ' + grce.o);
-      
       // Add the global reference to the procedure body
       p.gr.push(grce);
       
-      go +=2;
       fO += 2 + b[fO];
     }
     fO++;
@@ -208,7 +198,6 @@ var exe = function(b) {
     
     while (b[fO] != 0 || b[fO + 1] != 0) {
     	var se = new Object();
-    
     	wO('New String');
     	
     	// Data Stack Offset
@@ -233,6 +222,8 @@ var exe = function(b) {
     while (b[fO] != 0 || b[fO + 1] != 0) {
     	var ar = new Object();
     	
+    	wO('New Array');
+		
     	// Data Stack Offset
     	ar.dso = i16(b, fO);
       	wO(' - Offset: ' + ar.dso);
@@ -265,7 +256,7 @@ var exe = function(b) {
     // Global Variables defined in the procedure.   
     for (var i = 0; i < p.gvs.length; i++) {
       p.gvs[i].EEi = EEo;
-      EEo += p.gvs[i].n.length + 2;
+      EEo += p.gvs[i].n.length + 4;
     }
     
     // Called Procedures
@@ -276,8 +267,8 @@ var exe = function(b) {
     
     // Parameters
     for (var i = 0; i < p.p.length; i++) {
-    	p.p[i].EEi = EEo;
-    	EEo += 2;
+      p.p[i].EEi = EEo;
+      EEo += 2;
     }
     
     // Global Variables Referenced

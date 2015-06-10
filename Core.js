@@ -25,43 +25,105 @@ var DSF = new Mem(1024 * 64);
 // Program Flags
 var gUPDATEON = 1;
 
+var opCodeFuncs = [];
+
+var calcMem = 0;
+
+// Stores wO values
+var debugWin = null; 
+var debugMsgs = [];
+var debugMsgMax = 20;
+
 // Initialiser
 function init() {
+  document.write('Psion OPO Runtime<br />');
+  document.write('Created by Kevin Pfister<br />');
+  document.write('<br />');
+    
+  // Push the initial graphical window.
+  Renderer.Init();
+  Renderer.gCREATE(0, 0, 640, 240, 1, 4);
+  
+  debugWin = document.createElement('div');
+  
+  document.write('<br /><br />');
+  document.body.appendChild(debugWin);
+  debugWin.width = 640;
+  debugWin.height = 480;
+  
+  // Add an event listener for keypresses
+  document.addEventListener( "keypress", doKeyDown, false )
+  
   // Load and store the executable
-  eList.push(new exe(Hex2Bytes(strap1)));
+  eList.push(new exe(Hex2Bytes(strap3)));
+  
+  // Visualise the memory
+  Debugger.VisualiseMemory();
+  
+  // Unknown opcodes
+  document.write('<br /><br />');
+  document.write('Unknown Opcodes:<br />');
   
   // Call the first procedure in the file
   CProc(0);
   
-  // Push the initial graphical window.
-  gWIN.push(new gCREATE());
+  // Allocate memory to the virtual Calculator register
+  calcMem = DSF.alloc(8);
   
   // Begin processing opcodes
   pOp();
 }
 
+function doKeyDown(e) {
+  if (DialogManager.dlgActive) {
+    wO(' Key Pressed: ' + e.keyCode);
+    DialogManager.ProcessKey(e.keyCode);
+  } else {
+    wO(' Key Pressed: ' + e.keyCode);
+  }
+}
+
 // Process Opcodes
 function pOp() {
-  while (rS == 2) {
+  // while (rS == 2 && !DialogManager.dlgActive ) {
+  if (rS == 2 && !DialogManager.dlgActive ) {
     pNOp();
+	
+	// Render the screen.
+	Renderer.Composite(false);
+	DialogManager.Composite();
     
     if (cpW != -1) {
     	// Calling Procedure
     	CProc(cpW);
     }
     
-    if (pc >= pS[pS.length-1].p.q) {
+    if (rpW != -1) {
+      RProc();
       
-  wO('Reached the end of the procedure');
+      if (pS.length == 0) {
+        // Finished
+        rS = 0;
+      }
+    }
+    
+    if (pS.length != 0 && pc >= pS[pS.length-1].p.q) {
+      
+      wO('Reached the end of the procedure');
       RProc();
     }
-  };
-  
-  if (rS == 1) {
-    // Internal Pause
-    setTimeout('pOp()',500);
   }
   
+  
+  if (rS == 1 || DialogManager.dlgActive) {
+    // Internal Pause state
+    setTimeout(pOp,500);
+	return;
+  } else if (rS == 2) {
+    // Running state
+    setTimeout(pOp,20);
+	return;
+  }
   
   wO('Application has terminated');
 }
@@ -71,212 +133,38 @@ function pNOp() {
   var op = pB[pc];
   var args = 0;
   
-  switch (op) {
-    // 0x00 - 0x03 PUSH+ the value of LL+
-    case 0x00:
-      // Get the Address
-      var LL = pdsf + u16(pB, pc + 1);
-      
-      // Get the Value
-      var val = i16(DSF.m, LL);
-      wO('0x00: PUSH+ the value(' + val + ') of LL+(' + LL + ') i16');
-      
-      // Push the value to the stack
-      pi16(val);
-      
-      pc += 2;
-      break;
-    case 0x01:
-      // Get the Address
-      var LL = pdsf + u16(pB, pc + 1);
-      
-      // Get the Value
-      var val = i32(DSF.m, LL);
-      wO('0x01: PUSH+ the value (' + val + ') of LL+(' + LL + ') i32');
-      
-      // Push the value to the stack
-      pi32(val);
-      
-      pc += 2;
-      break;
-    case 0x02:
-      // TODO
-    case 0x03:
-      // Get the Address
-      var LL = pdsf + u16(pB, pc + 1);
-      
-      // Get the Value
-      var val = CStr(pB, LL);
-      wO('0x03: PUSH+ the value of LL+(' + LL + ') String: "' + val + '"');
-      
-      // Push the value to the stack
-      // TODO
-      
-      pc += 2;
-      break;
-    
-    // 0x04 - 0x07 PUSH+ the address of LL+
-    case 0x04:
-    case 0x05:
-    case 0x06:
-    case 0x07:
-      var LL = pdsf + u16(pB, pc + 1);
-      wO('0x04 - 0x07: PUSH+ the address of LL+(' + LL + ')');
-      pu16(LL);
-      pc += 2;
-      break;
-    // 0x08 - 0x0B PUSH+ the value of EE+ 
-    case 0x08:
-    case 0x09:
-    case 0x0A:
-    case 0x0B:
-      
-      var EE = u16(pB, pc + 1);
-      wO('0x08 - 0x0B: PUSH+ the value of EE+(' + EE + ') - TODO');
-      pc += 2;
-        
-      // TODO
-      
-      break;
-      
-    // 0x0C - 0x0F PUSH+ the address of EE+
-    case 0x0C:
-    case 0x0D:
-    case 0x0E:
-    case 0x0F:
-      var EEn = getEEn(i16(pB, pc + 1));
-      wO('0x0C - 0x0F PUSH+ the address of EE+(' + EEn + ') - TODO');
-      pc += 2;
-      
-      if (strcmp(EEn, '') != 0) {
-        wO('ER_FN_BA');
-        return;
-      }
-      
+  switch (op) {    
+    case 0x1C:
+    case 0x1D:
+    case 0x1E:
+    case 0x1F:
+      var EEn = Stack.ppi16();
+      wO('0x1C - 0x1F PUSH+ the address of EE+(' + EEn + ') - TODO');
+
       // Get the address of the global
-      getEEv(EEn);
-      break;
-    case 0x10:
-      var LL = pdsf + u16(pB, pc + 1);
-      pc++;
-      var FV = ppi16();
-      LL+= FV * 2 - 2;
-      pi16(i16(DSF.m, LL));
-      wO('0x10: PUSH+ the value(' + i16(DSF.m, LL) + ') of LL+(' + LL + ') FF(' + FV + ')');
-    case 0x12:
-      var LL = pdsf + ppu16();
-      var val = i16(DSF.m, LL);
-      wO('0x12: PUSH+ the value(' + val + ') of LL+(' + LL + ')');
-      pi16(val);
-      break;
-    case 0x14:
-      var LL = pdsf + u16(pB, pc + 1);
-      pc += 2;
-      var FV = ppi16();
-      LL+= FV * 2 - 2;
-      pi16(LL);
-      
-      wO('0x14: PUSH= the address(' + LL + ') of LL+(' + FV + ') - TODO');
-      break;
-    // 0x28 - 0x2B PUSH+ VV+
-    case 0x28:
-      var vl = i16(pB, pc + 1);
-      wO('0x28: PUSH+ VV+(' + vl + ')');
-      pc+=2;
-      pi16(vl);
-      break;
-    case 0x29:
-      var vl = i32(pB, pc + 1);
-      wO('0x29: PUSH+ VV+(' + vl + ')');
-      pc+=4;
-      pi32(vl);
-      break;
-    case 0x2B:
-      var arg = CStr(pB, ++pc);
-      wO('0x2B: PUSH$ "' + arg + '"');
-      
-      ps(arg);
-      pc+= 1 + arg.length;
-      
-      break;
-    case 0x30:
-      var arg1 = ppi16();
-      var arg2 = ppi16();
-      
-      wO('0x30: push(i16) ' + arg2 + ' < ' + arg1);
-      
-      if (arg1 > arg2) {
-        pi16(-1);
-      } else {
-        pi16(0);
-      }
-      break;
-    case 0x31:
-      var arg1 = ppi32();
-      var arg2 = ppi32();
-      
-      wO('0x31: push(i32) ' + arg2 + ' < ' + arg1);
-      
-      if (arg1 > arg2) {
-        pi32(-1);
-      } else {
-        pi32(0);
-      }
-      break;
-    case 0x3D:
-      var arg1 = ppi32();
-      var arg2 = ppi32();
-      wO('0x3D: push(i32) ' + arg2 + ' >= ' + arg1);
-      if (arg2 >= arg1) {
-        pi32(-1);
-      } else {
-        pi32(0);
-      }
-      break;
-    case 0x48:
-      var arg1 = ppi16();
-      var arg2 = ppi16();
-      
-      wO('0x48: push(i16) ' + arg2 + ' + ' + arg1);
-      pi16(arg2 + arg1);
-      break;
-    case 0x4C:
-      var arg1 = ppi16();
-      var arg2 = ppi16();
-      
-      wO('0x4C: push(i16) ' + arg2 + ' - ' + arg1);
-      pi16(arg2 - arg1);
-      break;
-    case 0x4D:
-      var arg1 = ppi32();
-      var arg2 = ppi32();
-      
-      wO('0x4D: push(i32) ' + arg2 + ' - ' + arg1);
-      pi32(arg2 - arg1);
-      break;
-    case 0x4F:
-      // Convert a byte to an Int16
-      var vl = pB[++pc];
-      wO('0x4F: Push ' + vl + ' ($80 to $FF convert to $FF80 to $FFFF)');
-      pi16(vl);
+      Stack.pu16(getEEa(EEn));
       break;
     case 0x53:
       wO('0x53: Call PROC EE');
       
       var rc = i16(pB, pc + 1);
-      wO('Call Procedure, Reference: ' + rc);
+      wO('* Call Procedure, Reference: ' + rc);
     
       pc += 2;
       cpW = getCPI(rc);
+	  if (cpW == -1) {
+	    // Unable to find correct CPW
+        ErrorHandler.Raise(-99);
+	  } else {
+        wO('* Procedure CPI Reference: ' + cpW);
+	  }
       break;
     case 0x57:
-      wO('0x57: Use extended function');
       pc++;
       pNOp57();
-      
       break;
     case 0x5B:
-      var IFarg = ppi16();
+      var IFarg = Stack.ppi16();
       var IFjmp = i16(pB, pc + 1);
       
       wO('0x5B: IF ' + IFarg + ' == 0 THEN GOTO +' + IFjmp);
@@ -289,20 +177,18 @@ function pNOp() {
       }
       break;
     case 0x61:
-      var val1 = ppi32();
-      var val2 = ppi32();
+      var val1 = Stack.ppi32();
+      var val2 = Stack.ppi32();
       
       var rc = val1 | val2;
       wO('0x61: PUSH& POP+2(' + val2 + ') | POP+1(' + val1 +')');
-      pi32(rc);
+      Stack.pi32(rc);
       break;
-    case 0x68:
-      wO('0x68: PUSH% -POP+');
-      pi16(-ppi16());
-      break;
-    case 0x69:
-      wO('0x69: PUSH% -POP+');
-      pi32(-ppi32());
+    case 0x63:
+      var val1 = Stack.ppi32();
+      
+      wO('0x63: push& VV%(' + val1 + ')');
+      Stack.pi32(val1);
       break;
     case 0x74:
     case 0x75:
@@ -311,33 +197,25 @@ function pNOp() {
       wO('0x74 - 0x77: RETURN');
       rpW = 1;
       break;
-    case 0x7C:
-      wO('0x7C: PUSH * value of POP% - TODO');
-      var val = ppi16();
+    case 0x80:
+    case 0x81:
+    case 0x82:
+    case 0x83:
+		wO('0x80 - 0x83: POP and discard');
+		Stack.ppd();
+		break;
+    case 0xA9:
+      var arg = pB[++pc];
+      wO('0xA9: ESCAPE ' + arg + ' - TODO');
       
-      // Push the value as a float
       break;
-    case 0x7D:
-      wO('0x7D: PUSH* value of POP& - TODO');
+    case 0xB1:
+      var arg = u16(pB, pc + 1);
       
-      // Push a double version of an Int32 variable
-      
-      pi32(ppi32());
-      break;
-    case 0x84:
-    case 0x85:
-    case 0x86:
-      // Value
-      var v = ppb();
-      
-      // Address
-      var addr = ppu16();
-      
-      wO('0x84 - 0x86: Store [' + v + '] in location ' + addr + ' - TODO');
-      
-      // Store the value
-      DSF.set(addr ,v);
-      break;
+      ErrorHandler.HandlerOffset = pc + arg;
+      wO('0xB1: ONERR jump to (' + ErrorHandler.HandlerOffset + ')');
+      pc += 2;
+      break; 
     case 0xBF:
       var arg = i16(pB, pc + 1);
       
@@ -345,42 +223,43 @@ function pNOp() {
       
       pc += arg - 1;
       break; 
-    case 0xCA:
-      var arg = ppi16();
-      wO('0xCA: gFONT ' + arg + ' - TODO');
-      break;
-    case 0xCE:
-      var arg = ppi16();
-      wO('0xCE: gSTYLE ' + arg + ' - TODO');
-      break;
-    case 0xD2:
-      var y = ppi16();
-      var x = ppi16();
-      wO('0xBF: gAT(' + x + ', ' + y + ')');
-      gWIN[gWIN.length - 1].gAT(x,y);
-      break;
-    case 0xD4:
-      var arg1 = ppi16();
-      wO('0xD4: gPRINT ' + arg1);
-      break;
-    case 0xE3:
-      // gUPDATE
+    case 0xC0:
+      wO('0xC0: RETURN POP+');
+      rpW = 1;
+      break; 
+    case 0xEB:
       var arg = pB[++pc];
-      if (arg > 1) {
-        // Update Graphics
-        // TODO
-      } else {
-        gUPDATEON = arg;
-      }
-      
+      wO('0xEB: mCARD ' + arg + ' - TODO');
       break;
     case 0xED:
       wO('0xED: Extended Dialog Box Commands');
       pc++;
       pNOpED();
       break;
+    case 0xF1:
+      var arg = pB[++pc];
+      wO('0xF1: LOCK ' + arg + ' - TODO');
+      break;
+    case 0xFF:
+      wO('0xFF: Extended Commands');
+      pc++;
+      pNOpFF();
+      break;
     default:
-      wO('Opcode: ' + op + ' at Offset ' + pc);
+	  // Check to see if it is in the OpCodeFuncs
+	  var fnd = false;
+      for (var i = 0; i < opCodeFuncs.length; i++) {
+	    if (opCodeFuncs[i].length == 2) {
+		  if (opCodeFuncs[i][0] == op) {
+			opCodeFuncs[i][1]();
+			fnd = true;
+			break;
+		  }
+		}
+      }
+	  if (!fnd) {
+        document.write('Opcode: ' + op + ' at Offset ' + pc + '<br />');
+	  }
   }
   pc++;
 }
@@ -395,34 +274,77 @@ function pNOp57() {
       wO('CALL ' + arg + ' arguments');
       w_CALL(arg);      
       break;
-    case 0x1C:
-      wO('0x1C: SECOND - TODO');
-      pi16(0);
+    case 0xD0:
+      var arg1 = Stack.ppi16();
+      var arg2 = Stack.pps();
+	  var nStr = "";
+	  for (var i=0; i<arg1; i++) {
+	    nStr+=arg2;
+	  }
+      wO('0x57 0xD0: REPT$ "' + arg2 + '", ' + arg1 + ' = "' + nStr + '"');
+	  Stack.ps(nStr);
       break;
     default:
-      wO('Opcode: 0x57 ' + op + ' at Offset ' + pc);
+      // Check to see if it is in the OpCodeFuncs
+	  var fnd = false;
+      for (var i = 0; i < opCodeFuncs.length; i++) {
+	    if (opCodeFuncs[i].length == 3) {
+		  if (opCodeFuncs[i][0] == op && opCodeFuncs[i][2] == 0x57) {
+			opCodeFuncs[i][1]();
+			fnd = true;
+			break;
+		  }
+		}
+      }
+	  if (!fnd) {
+	    document.write('Opcode: 0x57 -> ' + op + ' at Offset ' + pc + '<br />');
+	  }
   }
-  
-  //pc++;
 }
 
-
 function pNOpED() {
-  // These are usually for Extended Dialog Box Commands
+  // These are for Extended Dialog Box Commands
   var op = pB[pc];
   
-  switch (op) {
-    default:
-      wO('Opcode: 0xED ' + op + ' at Offset ' + pc);
+  // Check to see if it is in the OpCodeFuncs
+  var fnd = false;
+  for (var i = 0; i < opCodeFuncs.length; i++) {
+    if (opCodeFuncs[i].length == 3) {
+      if (opCodeFuncs[i][0] == op && opCodeFuncs[i][2] == 0xED) {
+        opCodeFuncs[i][1]();
+        fnd = true;
+        break;
+      }
+    }
   }
+  if (!fnd) {
+	document.write('Opcode: 0xED -> ' + op + ' at Offset ' + pc + '<br />');
+  }
+}
+
+function pNOpFF() {
+  // These are for Extended Dialog Box Commands
+  var op = pB[pc];
   
-  //pc++;
+  // Check to see if it is in the OpCodeFuncs
+  var fnd = false;
+  for (var i = 0; i < opCodeFuncs.length; i++) {
+    if (opCodeFuncs[i].length == 3) {
+      if (opCodeFuncs[i][0] == op && opCodeFuncs[i][2] == 0xFF) {
+        opCodeFuncs[i][1]();
+        fnd = true;
+        break;
+      }
+    }
+  }
+  if (!fnd) {
+	document.write('Opcode: 0xFF -> ' + op + ' at Offset ' + pc + '<br />');
+  }
 }
 
 // Get the index of an externally referenced procedure
 function getCPI(ee) {
   var CPn = getEEn(ee);
-  
   
   wO('EE value of ' + ee + ' corresponds to ' + CPn);
   
@@ -438,9 +360,9 @@ function getCPI(ee) {
 // Get the name of an externally referenced variable or proc
 function getEEn(ee) {
   
-  wO('Get the procedure ID of the running PROC');
   var tP = pS[pS.length - 1].p;
-  var pID = tP.i;
+  var pID = tP.n;
+  wO(' * Get the procedure ID of the running PROC ' + pID);
   
   
   wO(' * Check Global Variables defined in the Procedure');
@@ -457,14 +379,20 @@ function getEEn(ee) {
   EEo = getEEo(ee, tP.gr);
   if (EEo) {return EEo.n;}
   
+  wO(' * ERROR: EE Reference not found!');
   return "";
 }
 
 // Returns the object which corresponds to an EE index if found
 function getEEo(ee, a) {
-  var rc = null;
-  
+  if (a.length > 0) {
+    wO('Minimum EE val: ' + a[0].EEi);
+  } else {
+    wO('No values to query EE');
+  }
+
   for (var i = 0; i < a.length; i++) {
+  	wO(' * EE [' + a[i].n + '] : ' + a[i].EEi);
     if (a[i].EEi == ee) {
       return a[i];
     }
@@ -473,48 +401,126 @@ function getEEo(ee, a) {
 
 // Return the type of an External
 function getEEt(ee) {
-  wO('Get the procedure ID of the running PROC');
+  wO(' * Get the procedure ID of the running PROC');
   var tP = pS[pS.length - 1].p;
-  var pID = tP.i;
-  
   
   wO(' * Check Global Variables defined in the Procedure');
-  var EEo = getEEo(ee, tP.gvs);
-  if (EEo) {return 0}
+  if (getEEo(ee, tP.gvs)) {return 0}
   
   
   wO(' * Check Called Procedures');
-  EEo = getEEo(ee, tP.cp);
-  if (EEo) {return 1}
+  if (getEEo(ee, tP.cp)) {return 1}
   
   
   wO(' * Check Global Variables Referenced');
-  EEo = getEEo(ee, tP.gr);
-  if (EEo) {return 2}
+  if (getEEo(ee, tP.gr)) {return 2}
+  
+  wO(' * ERROR: EE Reference not found!');
 }
 
 // Return the value of an External
 function getEEv(ee) {
-  wO('Get the procedure ID of the running PROC');
+  wO(' * Get the procedure ID of the running PROC');
   var tP = pS[pS.length - 1].p;
   var pID = tP.i;
   
   wO(' * Check Global Variables defined in the Procedure');
   var EEo = getEEo(ee, tP.gvs);
   if (EEo) {
-    wO(' EE value references a declared global variable');
+    wO(' EE value references a declared global variable: ' + EEo.n);
+	// Return a value based on the type
+    return getEEoV(EEo);
   }
   
   wO(' * Check Global Variables Referenced');
   EEo = getEEo(ee, tP.gr);
   if (EEo) {
-    wO(' EE value references a referenced global variable');
+    wO(' EE value references a referenced global variable: ' + EEo.n);
+    
+    // Return a value based on the type
+    return getEEoV(EEo);
   }
+  
+  wO(' * ERROR: EE Reference not found!');
+}
+
+function getEEa(ee) {
+  wO(' * Get the procedure ID of the running PROC');
+  var tP = pS[pS.length - 1].p;
+  var pID = tP.i;
+  
+  wO(' * Check Global Variables defined in the Procedure');
+  var EEo = getEEo(ee, tP.gvs);
+  if (EEo) {
+    wO(' EE value references a declared global variable: ' + EEo.n);
+	// Return a value based on the type
+    return EEo.d;
+  }
+  
+  wO(' * Check Global Variables Referenced');
+  EEo = getEEo(ee, tP.gr);
+  if (EEo) {
+    wO(' EE value references a referenced global variable: ' + EEo.n);
+    
+    // Return a value based on the type
+    return EEo.d;
+  }
+  
+  wO(' * ERROR: EE Reference not found!');
+}
+
+function getEEoV(EEo) {
+  if (EEo.t == 0) {
+    return i16(DSF.m, EEo.d);
+  } else if (EEo.t == 1) {
+    return i32(DSF.m, EEo.d);
+  } else if (EEo.t == 2) {
+	return f64(DSF.m, EEo.d);
+  } else if (EEo.t == 3) {
+  	// String (Offset 0 is the max string length)
+  	return CStr(DSF.m, EEo.d + 1);
+  }
+}
+
+// Return the value type of an External
+function getEEvt(ee) {
+  var tP = pS[pS.length - 1].p;
+  var pID = pS[pS.length - 1].i;
+  wO(' * Get the procedure ID of the running PROC [' + pID + ']');
+  
+  wO(' * GVS: ' + tP.gvs.length);
+  wO(' * CP: ' + tP.cp.length);
+  wO(' * P: ' + tP.p.length);
+  wO(' * GR: ' + tP.gr.length);
+  
+  wO('Query EE value references in declared global variables');
+  var EEo = getEEo(ee, tP.gvs);
+  if (EEo) {
+    wO(' EE value references a declared global variable: ' + EEo.n);
+	return EEo.t;
+  }
+  
+  wO('Query EE value references in Parameters');
+  EEo = getEEo(ee, tP.p);
+  if (EEo) {
+    wO(' EE value references a Parameter: ' + EEo.n);
+	return EEo.t;
+  }
+  
+  wO('Query EE value references in referenced global variables');
+  EEo = getEEo(ee, tP.gr);
+  if (EEo) {
+    wO(' EE value references a referenced global variable: ' + EEo.n);
+	return EEo.t;
+  }
+  
+  
+  wO(' * ERROR: EE Reference (' + ee + ') not found!');
 }
 
 // Call Procedure
 function CProc(i) {
-  wO('Calling Procedure: ' + pList[i].n);
+  wO('Calling Procedure: ' + pList[i].n + ':');
   
   // Clear the Call Procedure Waiting Flag
   cpW = -1;
@@ -522,6 +528,11 @@ function CProc(i) {
   // Save the procedure counter that was running
   if (pS.length > 0) {
     pS[pS.length - 1].pc = pc;
+  }
+  
+  if (pS.length == 255) {
+    ErrorHandler.Raise(-13);
+	return;
   }
   
   // Procedure Stack Item
@@ -533,6 +544,8 @@ function CProc(i) {
   // Store a link to the procedure Object
   psi.p = pList[i];
   
+  // Store the offset to the DSF proc cache
+  psi.pdsf = pdsf;
   
   wO('QCode Length of PROC: ' + psi.p.q);
   
@@ -545,26 +558,66 @@ function CProc(i) {
   pB = pS[pS.length - 1].p.qc;
   
   // Alloc space and save the link to the DSF position for the procedure
-  pdsf = DSF.alloc(pList[i].d);
+  pdsf = DSF.alloc(pList[i].d, 2);
   
   // Go through and initialise space for variables.
+  wO('Initialising procedure variables: ');
+  for (var i = 0; i< psi.p.ac.length; i++) {
+  	wO('Initialising array - Offset: ' + (pdsf + psi.p.ac[i].dso) + ' Size: ' + psi.p.ac[i].s);
+	if (psi.p.ac[i].s < 255)
+	{
+		DSF.set((pdsf + psi.p.ac[i].dso), [0, psi.p.ac[i].s]);
+	}
+	else
+	{
+		// Todo: Fix for 16bit values (greater than 255)
+		DSF.set((pdsf + psi.p.ac[i].dso), [psi.p.ac[i].s,0]);
+	}
+  }
+  for (var i = 0; i< psi.p.sc.length; i++) {
+  	wO('Initialising string - Offset: ' + (pdsf + psi.p.sc[i].dso) + ' Size: ' + psi.p.sc[i].s );
+  	DSF.set((pdsf + psi.p.sc[i].dso), [psi.p.sc[i].s, 0]);
+  }
+  
+  // Visualise the memory
+  Debugger.VisualiseMemory();
 }
 
 // Return from a procedure
 function RProc() {
-  // DSF.dealloc(pdsf);
+  DSF.dealloc(pdsf);
+  
+  // Cancel error handling
+  ErrorHandler.HandlerOffset = -1;
   
   // Remove the top of the stack
   pS.pop();
   if (pS.length == 0) {
     rS = 0;
+    wO('Proc Stack is now empty ');
   } else {
   	pc = pS[pS.length - 1].pc;
   	pB = pS[pS.length - 1].p.qc;
+    pdsf = pS[pS.length - 1].pdsf;
+    wO('Returning control to PROC ' + pS[pS.length - 1].p.n + ':');
   }
+  // Reset the Return Procedure Waiting flag
+  rpW = -1;
 }
 
 // Write output to chosen method
 function   wO(m) {
-    document.write('<br />' + m);
+  debugMsgs.push(m);
+  
+  if (debugMsgs.length > debugMsgMax) {
+    debugMsgs.shift();
+  }
+
+  if (debugWin != null) {
+    var debugTxt = '';
+    for(var i=0; i< debugMsgs.length; i++) {
+      debugTxt += debugMsgs[i] + '<br />';
+    }
+    debugWin.innerHTML = debugTxt;
+  }
 }

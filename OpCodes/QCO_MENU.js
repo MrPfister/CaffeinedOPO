@@ -1,0 +1,7 @@
+// Menu Operators
+
+opCodeFuncs.push(
+
+
+
+);
