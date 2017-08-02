@@ -13,7 +13,7 @@ Debugger.VisualiseMemory = function() {
     this.debugCanvas.width= 256 * this.zoomSize;
   
     document.write('<br />');
-    document.write('Memory Allocation Layout:<br />');
+    document.write('<b>Memory Allocation Layout:</b><br />');
     document.write('<br />');
     document.body.appendChild(this.debugCanvas);
     document.write('<br />');
@@ -46,18 +46,27 @@ Debugger.VisualiseMemory = function() {
         // Allocated
         for (var iy = 0; iy< this.zoomSize; iy++) {
           for (var ix = 0; ix< this.zoomSize; ix++) {
-          
-            if (DSF.c[i][3] == 1) {
-              this.debugRenderImage.data[dRI + (iy * 1024 * this.zoomSize) + ix * 4] = 0;
-            } else if (DSF.c[i][3] == 2) {
-              this.debugRenderImage.data[dRI + (iy * 1024 * this.zoomSize) + ix * 4] = 128;
-            } else {
-              this.debugRenderImage.data[dRI + (iy * 1024 * this.zoomSize) + ix * 4] = 255;
-            }
-            
             this.debugRenderImage.data[dRI + (iy * 1024 * this.zoomSize) + ix * 4 + 1] = 0;
             this.debugRenderImage.data[dRI + (iy * 1024 * this.zoomSize) + ix * 4 + 2] = 0;
             this.debugRenderImage.data[dRI + (iy * 1024 * this.zoomSize) + ix * 4 + 3] = 255;
+            if (DSF.c[i][3] == 1) {
+				// Global
+              this.debugRenderImage.data[dRI + (iy * 1024 * this.zoomSize) + ix * 4] = 0;
+            } else if (DSF.c[i][3] == 2) {
+				// Procedure
+              this.debugRenderImage.data[dRI + (iy * 1024 * this.zoomSize) + ix * 4] = 128;
+            } else if (DSF.c[i][3] == 3) {
+				// Dynamic
+              this.debugRenderImage.data[dRI + (iy * 1024 * this.zoomSize) + ix * 4] = 255;
+            }
+			else
+			{
+		      // Stack
+              this.debugRenderImage.data[dRI + (iy * 1024 * this.zoomSize) + ix * 4] = 128;
+              this.debugRenderImage.data[dRI + (iy * 1024 * this.zoomSize) + ix * 4 + 1] = 0;
+              this.debugRenderImage.data[dRI + (iy * 1024 * this.zoomSize) + ix * 4 + 2] = 128;
+			}
+            
           }
         }
       }

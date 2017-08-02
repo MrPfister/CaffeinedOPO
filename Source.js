@@ -78,7 +78,10 @@ var exe = function(b) {
     
     p.p = [];
     for (var i=0; i< p.ps; i++) {
-      p.p.push(++fO);
+      var po = new Object();
+	  po.t = ++fO;
+	  po.n = "param";
+      p.p.push(po);
     }
     fO++;
     

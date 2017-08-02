@@ -79,6 +79,9 @@ DialogManager.Composite = function() {
       case 4:
         this.Render_dFLOAT(i);
         break;
+	  case 5:
+	    this.Render_dCHOICE(i);
+		break;
     }
   }
   
@@ -129,6 +132,17 @@ DialogManager.ProcessKey = function(keyCode) {
     this.dlgActive = false;
     this.SaveValues();
   }
+  else
+  {
+	  // Add value to active dialog item.
+	  if (this.dlgItems[this.activeItem][3] == 3)
+	  {
+		  // dTEXT box
+		  this.dlgItems[this.activeItem][4] += String.fromCharCode(keyCode);
+		  
+		  this.Composite();
+	  }
+  }
 }
 
 DialogManager.SaveValues = function() {
@@ -138,6 +152,7 @@ DialogManager.SaveValues = function() {
       
       switch (this.dlgItems[i][3]) {
         case 0: // Int16
+		  DSF.set(this.dlgItems[i][2], i162b(this.dlgItems[i][4]));
           break;
         case 1: // Int32
           break;
@@ -155,6 +170,8 @@ DialogManager.SaveValues = function() {
 DialogManager.dINIT = function(title, flags) {
   // Cancel any existing active dialog under construction
   this.dlgItems = [];
+  
+  this.activeItem = 0;
   
   this.posX = 0;
   this.posY = 0;
@@ -217,7 +234,7 @@ DialogManager.Render_dTEXT = function(index) {
   this.dlgContext.fillText(this.dlgItems[index][3], dlgTxtOffsetX, this.dlgRowHeight * index + 14);
 }
 
-DialogManager.dEDIT = function(varAddr, prompt, len) {
+DialogManager.dEDIT = function(varAddr, prompt, len, priv) {
   // Padding = 4 + 2 + 2
   var reqWidth = this.dlgContext.measureText(prompt).width + len + 12;
   
@@ -225,8 +242,9 @@ DialogManager.dEDIT = function(varAddr, prompt, len) {
     // No length was specified, default to 50 pixel input box
 	reqWidth += 50;
   }
- 
-  this.dlgItems.push([3, reqWidth, varAddr, 3, CStr(DSF.m,varAddr), prompt, len]);
+  
+  this.dlgItems.push([3, reqWidth, varAddr, 3, CStr(DSF.m,varAddr), prompt, len, priv]);
+  this.activeItem = this.dlgItems.length - 1;
 }
 
 DialogManager.Render_dEDIT = function(index) {
@@ -248,12 +266,27 @@ DialogManager.Render_dEDIT = function(index) {
   this.dlgContext.strokeRect(this.dlgInternalWidth - entryBoxWth - 3.5, this.dlgRowHeight * index + 1.5, entryBoxWth ,this.dlgRowHeight - 4);
   
   // Enter the text in the box
-  this.dlgContext.fillText(this.dlgItems[index][4], this.dlgInternalWidth - entryBoxWth + 2, this.dlgRowHeight * index + 14, entryBoxWth - 4);
+  if (this.dlgItems[index][7] == true)
+  {
+	// dXINPUT Password box
+	var passText = "";
+	for (var i = 0; i < this.dlgItems[index][4].length; i++)
+	{
+		passText+="*";
+	}
+    this.dlgContext.fillText(passText, this.dlgInternalWidth - entryBoxWth + 2, this.dlgRowHeight * index + 14, entryBoxWth - 8);
+  }
+  else
+  {
+    // Regular dEDIT
+    this.dlgContext.fillText(this.dlgItems[index][4], this.dlgInternalWidth - entryBoxWth + 2, this.dlgRowHeight * index + 14, entryBoxWth - 8);
+  }
 }
 
 DialogManager.dFLOAT = function(varAddr, prompt, min, max) {
   var reqWidth = this.dlgContext.measureText(prompt).width + this.dlgDefNumBoxWidth + 12;
   this.dlgItems.push([4, reqWidth, varAddr, 3, f64(DSF.m, varAddr), prompt, min, max]);
+  this.activeItem = this.dlgItems.length - 1;
 }
 
 DialogManager.Render_dFLOAT = function(index) {
@@ -271,7 +304,32 @@ DialogManager.Render_dFLOAT = function(index) {
   this.dlgContext.strokeRect(this.dlgInternalWidth - entryBoxWth - 3.5, this.dlgRowHeight * index + 1.5, entryBoxWth ,this.dlgRowHeight - 4);
   
   // Enter the number in the box
-  this.dlgContext.fillText(this.dlgItems[index][4], this.dlgInternalWidth - entryBoxWth + 2, this.dlgRowHeight * index + 14, entryBoxWth - 4);
+  this.dlgContext.fillText(this.dlgItems[index][4], this.dlgInternalWidth - entryBoxWth + 2, this.dlgRowHeight * index + 14, entryBoxWth - 8);
+}
+
+DialogManager.dCHOICE = function(varAddr, prompt, values) {
+  var reqWidth = this.dlgContext.measureText(prompt).width + this.dlgDefNumBoxWidth + 12;
+  this.dlgItems.push([5, reqWidth, varAddr, 1, i16(DSF.m,varAddr), prompt, values]);
+  this.activeItem = this.dlgItems.length - 1;
+}
+
+DialogManager.Render_dCHOICE = function(index) {
+  // Left hand prompt message
+  this.dlgContext.fillStyle  = "#000000";
+  this.dlgContext.fillText(this.dlgItems[index][5], 4, this.dlgRowHeight * index + 14);
+  
+  // Draw bounding box for text input area
+  var dlgTxtOffsetX = this.dlgContext.measureText(this.dlgItems[index][5]).width + 12;
+  
+  var entryBoxWth = this.dlgInternalWidth - dlgTxtOffsetX;
+  entryBoxWth = Math.min(this.dlgMaxNumBoxWidth, entryBoxWth);
+  
+  this.dlgContext.strokeStyle = "#A0A0A0";
+  this.dlgContext.strokeRect(this.dlgInternalWidth - entryBoxWth - 3.5, this.dlgRowHeight * index + 1.5, entryBoxWth ,this.dlgRowHeight - 4);
+  
+  // Render the text which is the currently selected item.
+  var selectedItem = this.dlgItems[index][4];
+  this.dlgContext.fillText(this.dlgItems[index][6].split(',')[selectedItem], this.dlgInternalWidth - entryBoxWth + 2, this.dlgRowHeight * index + 14, entryBoxWth - 8);
 }
 
 DialogManager.DIALOG = function() {

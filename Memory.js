@@ -1,4 +1,6 @@
 // Memory Manager
+// Note: Typed arrays have to be forced to access via Little Endian. DataView defaults to Big-Endian.
+
 var Mem = function(size) {
   // Alloc the memory
   this.m = new Array(size);
@@ -12,6 +14,7 @@ var Mem = function(size) {
   // 1 = Global
   // 2 = Procedure
   // 3 = Dynamic
+  // 4 = Stack
   
   // Peek at the contents of a memory address
   this.peek = function(i) {
@@ -20,7 +23,7 @@ var Mem = function(size) {
   
   // Allocate in memory contents of a certain size
   this.alloc = function(s, t) {
-    wO('Allocating ' + s + 'bytes of memory');
+    wO('Allocating ' + s + ' bytes of memory');
     for(var i = 0; i< this.c.length; i++) {
       var l = this.c[i][1], o = this.c[i][2];
       if (this.c[i][0] == 0 && l >= s) {
@@ -122,7 +125,6 @@ var Mem = function(size) {
         
         wO(' * Cell modified to: [' + this.c[i][0] + ', ' + this.c[i][1] + ', ' + o + ']');
         
-        
         // Call this function again, will create from an empty cell with the start
         // offset
         this.reserve(o, s);
@@ -155,19 +157,13 @@ function i16(a,o) {
 // a = Array
 // o = Offset
 function f64(a,o) {
-	var buffer = new ArrayBuffer(8);
-	var uint8s = new Uint8Array(buffer);
-	uint8s[0] = a[o];
-	uint8s[1] = a[o + 1];
-	uint8s[2] = a[o + 2];
-	uint8s[3] = a[o + 3];
-	uint8s[4] = a[o + 4];
-	uint8s[5] = a[o + 5];
-	uint8s[6] = a[o + 6];
-	uint8s[7] = a[o + 7];
-	var fBuffer = new Float64Array(buffer);
-	
-    return fBuffer[0];
+  var buffer = new ArrayBuffer(8);
+  var dv = new DataView(buffer);
+  for (var i=0; i<8; i++)
+  {
+	  dv.setUint8(i, a[o + i]);
+  }
+  return dv.getFloat64(0, true);
 }
 
 // Return a 32 bit Signed Integer
@@ -193,23 +189,75 @@ function u32(a,o) {
 
 // Integer Bitwise converter
 function iC(a,o,l) {
-    var r = 0;
-    for (var i=0; i<l; i++) {
-      r += a[i + o] << (i * 8);
-    }
-    return r;
+	if (o + l > a.length)
+	{
+		wO('ERROR: Memory Read Offset failure! O: ' + o + ', L: ' + l);
+		rS = 0;
+		return 0;
+	}
+	
+	var buffer = new ArrayBuffer(l);
+	var dv = new DataView(buffer);
+	for (var i=0; i<l;i++)
+	{
+		dv.setUint8(i, a[o+i]);
+	}
+	
+	if (l == 2)
+	{
+		// Int16
+		return dv.getInt16(0, true);
+	}
+	else if (l == 4)
+	{
+		// Int32
+		return dv.getInt32(0, true);
+	}
+	else 
+	{
+		// Invalid size for PSION ints
+		wO('Invalid PSION Integer Size!');
+		rS = 0; // Stop execution
+	}
 }
 
+// Convert a float into a 8 byte array
 function cf64(v) {
   var buffer = new ArrayBuffer(8);
-  var intView = new Uint8Array(buffer);
-  var floatView = new Float64Array(buffer);
-  
-  floatView[0] = v;
-  
-  return intView;
+  var dv = new DataView(buffer);
+  dv.setFloat64(0, v, true);
+	
+  return [dv.getUint8(0), dv.getUint8(1), dv.getUint8(2), dv.getUint8(3), dv.getUint8(4), dv.getUint8(5), dv.getUint8(6), dv.getUint8(7)];
 }
 
+// Convert an i16 number into a 2 byte array
+function i162b(v) {
+  var buffer = new ArrayBuffer(2);
+  var dv = new DataView(buffer);
+  dv.setInt16(0, v, true);
+  return [dv.getUint8(0), dv.getUint8(1)];
+}
+
+// Convert an i32 number into a 4 byte array
+function i322b(v) {
+  var buffer = new ArrayBuffer(4);
+  var dv = new DataView(buffer);
+  dv.setInt32(0, v, true);
+  return [dv.getUint8(0), dv.getUint8(1), dv.getUint8(2), dv.getUint8(3)];
+}
+
+function checkEndian(){
+    var a = new ArrayBuffer(4);
+    var b = new Uint8Array(a);
+    var c = new Uint32Array(a);
+    b[0] = 0xa1;
+    b[1] = 0xb2;
+    b[2] = 0xc3;
+    b[3] = 0xd4;
+    if(c[0] == 0xd4c3b2a1) return "little endian";
+    if(c[0] == 0xa1b2c3d4) return "big endian";
+    else throw new Error("Something crazy just happened"); 
+}
 
 // Convert a hex string into an array of bytes
 function Hex2Bytes(s) {
@@ -217,5 +265,6 @@ function Hex2Bytes(s) {
   for (var i=0; i<s.length; i++) {
     r.push(parseInt(s[i] + s[++i], 16));
   }
+  
   return r;
 }

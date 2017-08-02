@@ -1,4 +1,4 @@
-// Run State 2 = Go, 1 = Paused,  0 = Stop, -1 = Error
+// Run State 3 = Paused(KeyPress), 2 = Go, 1 = Paused,  0 = Stop, -1 = Error
 var rS = 2;
 
 // Executable list
@@ -9,6 +9,9 @@ var pS = [];
 
 // Call and return from procedure index flags
 var cpW = -1, rpW = -1;
+
+// Pause Waiting flag
+var pW = 0;
 
 // Procedure Offset
 var pc = 0;
@@ -32,24 +35,36 @@ var calcMem = 0;
 // Stores wO values
 var debugWin = null; 
 var debugMsgs = [];
-var debugMsgMax = 20;
+var debugMsgMax = 50;
+
+var stackWin = null;
+
+// Keypress information
+var lastKeyPress = 0;
 
 // Initialiser
 function init() {
   document.write('Psion OPO Runtime<br />');
   document.write('Created by Kevin Pfister<br />');
   document.write('<br />');
+  
+  // Memory Test code
+  //DSF.set(0, cf64(3.141592653));
+  //document.write(f64(DSF.m, 0));
+  //return;
     
   // Push the initial graphical window.
   Renderer.Init();
   Renderer.gCREATE(0, 0, 640, 240, 1, 4);
   
   debugWin = document.createElement('div');
+  stackWin = document.createElement('div');
   
   document.write('<br /><br />');
   document.body.appendChild(debugWin);
   debugWin.width = 640;
   debugWin.height = 480;
+  
   
   // Add an event listener for keypresses
   document.addEventListener( "keypress", doKeyDown, false )
@@ -60,9 +75,14 @@ function init() {
   // Visualise the memory
   Debugger.VisualiseMemory();
   
+  document.write('<br /><b>Stack Contents:</b><br />');
+  document.body.appendChild(stackWin);
+  stackWin.width = 640;
+  stackWin.height = 480;
+  
   // Unknown opcodes
   document.write('<br /><br />');
-  document.write('Unknown Opcodes:<br />');
+  document.write('<b>Unknown Opcodes:</b><br />');
   
   // Call the first procedure in the file
   CProc(0);
@@ -80,6 +100,7 @@ function doKeyDown(e) {
     DialogManager.ProcessKey(e.keyCode);
   } else {
     wO(' Key Pressed: ' + e.keyCode);
+	lastKeyPress = e.KeyCode;
   }
 }
 
@@ -92,6 +113,7 @@ function pOp() {
 	// Render the screen.
 	Renderer.Composite(false);
 	DialogManager.Composite();
+	Stack.visualise();
     
     if (cpW != -1) {
     	// Calling Procedure
@@ -100,11 +122,6 @@ function pOp() {
     
     if (rpW != -1) {
       RProc();
-      
-      if (pS.length == 0) {
-        // Finished
-        rS = 0;
-      }
     }
     
     if (pS.length != 0 && pc >= pS[pS.length-1].p.q) {
@@ -114,6 +131,8 @@ function pOp() {
     }
   }
   
+  // Visualise the memory
+  Debugger.VisualiseMemory();
   
   if (rS == 1 || DialogManager.dlgActive) {
     // Internal Pause state
@@ -121,10 +140,42 @@ function pOp() {
 	return;
   } else if (rS == 2) {
     // Running state
-    setTimeout(pOp,20);
+	if (pW > 0)
+	{
+	  // Pause for a certain time period
+      setTimeout(pOp, pW);
+	  pW = 0;
+	}
+	else
+	{
+      setTimeout(pOp, 100);
+	}
 	return;
+  } else if (rS == 3) {
+    // Paused state, awaiting keypress
+	if (lastKeyPress != 0)
+	{
+		// Key has been pressed.
+		rS = 2;
+		pW = 0; // Cancel any pause state.
+		lastKeyPress = 0;
+	}
+	
+	if (pW > 0)
+	{
+		// The system was in a pause awaiting a keypress.
+		pW -= 10;
+		if (pW<=0)
+		{
+			pW = 0;
+			rS = 2; // Return to running.
+		}
+	}
+	
+    setTimeout(pOp, 10);
   }
   
+  // rS = 0
   wO('Application has terminated');
 }
 
@@ -134,16 +185,7 @@ function pNOp() {
   var args = 0;
   
   switch (op) {    
-    case 0x1C:
-    case 0x1D:
-    case 0x1E:
-    case 0x1F:
-      var EEn = Stack.ppi16();
-      wO('0x1C - 0x1F PUSH+ the address of EE+(' + EEn + ') - TODO');
 
-      // Get the address of the global
-      Stack.pu16(getEEa(EEn));
-      break;
     case 0x53:
       wO('0x53: Call PROC EE');
       
@@ -175,14 +217,6 @@ function pNOp() {
         pc+=2;
         wO(' * IF condition failed');
       }
-      break;
-    case 0x61:
-      var val1 = Stack.ppi32();
-      var val2 = Stack.ppi32();
-      
-      var rc = val1 | val2;
-      wO('0x61: PUSH& POP+2(' + val2 + ') | POP+1(' + val1 +')');
-      Stack.pi32(rc);
       break;
     case 0x63:
       var val1 = Stack.ppi32();
@@ -225,12 +259,9 @@ function pNOp() {
       break; 
     case 0xC0:
       wO('0xC0: RETURN POP+');
+	  Stack.ppd();
       rpW = 1;
       break; 
-    case 0xEB:
-      var arg = pB[++pc];
-      wO('0xEB: mCARD ' + arg + ' - TODO');
-      break;
     case 0xED:
       wO('0xED: Extended Dialog Box Commands');
       pc++;
@@ -273,16 +304,6 @@ function pNOp57() {
       
       wO('CALL ' + arg + ' arguments');
       w_CALL(arg);      
-      break;
-    case 0xD0:
-      var arg1 = Stack.ppi16();
-      var arg2 = Stack.pps();
-	  var nStr = "";
-	  for (var i=0; i<arg1; i++) {
-	    nStr+=arg2;
-	  }
-      wO('0x57 0xD0: REPT$ "' + arg2 + '", ' + arg1 + ' = "' + nStr + '"');
-	  Stack.ps(nStr);
       break;
     default:
       // Check to see if it is in the OpCodeFuncs
@@ -416,6 +437,9 @@ function getEEt(ee) {
   if (getEEo(ee, tP.gr)) {return 2}
   
   wO(' * ERROR: EE Reference not found!');
+  
+  // Stop Execution
+  rS = 0;
 }
 
 // Return the value of an External
@@ -442,6 +466,9 @@ function getEEv(ee) {
   }
   
   wO(' * ERROR: EE Reference not found!');
+  
+  // Stop Execution
+  rS = 0;
 }
 
 function getEEa(ee) {
@@ -467,6 +494,9 @@ function getEEa(ee) {
   }
   
   wO(' * ERROR: EE Reference not found!');
+  
+  // Stop Execution
+  rS = 0;
 }
 
 function getEEoV(EEo) {
@@ -493,29 +523,40 @@ function getEEvt(ee) {
   wO(' * P: ' + tP.p.length);
   wO(' * GR: ' + tP.gr.length);
   
-  wO('Query EE value references in declared global variables');
-  var EEo = getEEo(ee, tP.gvs);
-  if (EEo) {
-    wO(' EE value references a declared global variable: ' + EEo.n);
-	return EEo.t;
+  if (tP.gvs.length > 0)
+  {
+    wO('Query EE value references in declared global variables');
+    var EEo = getEEo(ee, tP.gvs);
+    if (EEo) {
+      wO(' EE value references a declared global variable: ' + EEo.n);
+	  return EEo.t;
+    }
   }
   
-  wO('Query EE value references in Parameters');
-  EEo = getEEo(ee, tP.p);
-  if (EEo) {
-    wO(' EE value references a Parameter: ' + EEo.n);
-	return EEo.t;
+  if (tP.p.length > 0)
+  {
+    wO('Query EE value references in Parameters');
+    EEo = getEEo(ee, tP.p);
+    if (EEo) {
+      wO(' EE value references a Parameter: ' + EEo.n);
+	  return EEo.t;
+    } 
   }
   
-  wO('Query EE value references in referenced global variables');
-  EEo = getEEo(ee, tP.gr);
-  if (EEo) {
-    wO(' EE value references a referenced global variable: ' + EEo.n);
-	return EEo.t;
+  if (tP.gr.length > 0)
+  {
+    wO('Query EE value references in referenced global variables');
+    EEo = getEEo(ee, tP.gr);
+    if (EEo) {
+      wO(' EE value references a referenced global variable: ' + EEo.n);
+	  return EEo.t;
+    }  
   }
-  
   
   wO(' * ERROR: EE Reference (' + ee + ') not found!');
+  
+  // Stop Execution
+  rS = 0;
 }
 
 // Call Procedure
@@ -524,11 +565,6 @@ function CProc(i) {
   
   // Clear the Call Procedure Waiting Flag
   cpW = -1;
-  
-  // Save the procedure counter that was running
-  if (pS.length > 0) {
-    pS[pS.length - 1].pc = pc;
-  }
   
   if (pS.length == 255) {
     ErrorHandler.Raise(-13);
@@ -540,6 +576,7 @@ function CProc(i) {
   
   // Store Index
   psi.i = i;
+  psi.pc = pc;
   
   // Store a link to the procedure Object
   psi.p = pList[i];
@@ -590,23 +627,23 @@ function RProc() {
   // Cancel error handling
   ErrorHandler.HandlerOffset = -1;
   
-  // Remove the top of the stack
-  pS.pop();
   if (pS.length == 0) {
     rS = 0;
-    wO('Proc Stack is now empty ');
+    wO('Proc Stack is now empty - Terminating execution.');
   } else {
   	pc = pS[pS.length - 1].pc;
   	pB = pS[pS.length - 1].p.qc;
     pdsf = pS[pS.length - 1].pdsf;
     wO('Returning control to PROC ' + pS[pS.length - 1].p.n + ':');
+	wO(' - Executing from: ' + pc);
+	pS.pop();
   }
   // Reset the Return Procedure Waiting flag
   rpW = -1;
 }
 
 // Write output to chosen method
-function   wO(m) {
+function  wO(m) {
   debugMsgs.push(m);
   
   if (debugMsgs.length > debugMsgMax) {

@@ -57,14 +57,14 @@ var Renderer = {
   gLINETO:function(x,y){this.gLINEBY(x-this.gX(),y-this.gY());},
   gFONT:function(f){this.AWnd[12]=f;this.SetFont();},
   gSTYLE:function(s){this.AWnd[13]=s;this.SetFont();},
-  gTWIDTH:function(t){return this.AWnd[11].measureText(t).width;}
+  gTWIDTH:function(t){return this.AWnd[11].measureText(t).width;},
 }
 
 // Graphical Layer
 Renderer.gCREATE = function(x, y, width, height, visible, flags) {
   // Get an available Window ID
   var winID = -1;
-  for(var i = 2; i < 65; i++) {
+  for(var i = 1; i < 65; i++) {
     var found = false;
 	
     for (var j=0; j < this.gWIN.length; j++) {
@@ -74,7 +74,7 @@ Renderer.gCREATE = function(x, y, width, height, visible, flags) {
 	  }
 	}
 	
-	if (found) {
+	if (!found) {
 	  winID = i;
 	  break;
 	}
@@ -82,6 +82,8 @@ Renderer.gCREATE = function(x, y, width, height, visible, flags) {
   
   // Create a window object.
   this.gWIN.unshift([winID, x, y, width, height, visible, flags, 0, 0, 0, document.createElement('canvas'), null, 1, 0]);
+  
+  document.write('Creating Window: ID: ' + winID + ', X: ' + x + ', Y: ' + y + ', Height: ' + height + ', Visibility: ' + visible + '<br>');
   
   this.ActiveID = winID;
   this.AWnd = this.gWIN[0];
@@ -317,11 +319,14 @@ Renderer.gCLOSE = function(i) {
   }
   
   // Remove the Wnd
-  this.gWIN.splice(this.GetIndexForID(this.ActiveID) - 1 ,1);
+  this.gWIN.splice(this.GetIndexForID(i), 1);
   
-  // Reset to Wnd ID 1
-  this.ActiveID = 1;
-  this.AWnd = this.gWIN[this.GetIndexForID(1)];
+  if (this.ActiveID == i)
+  {
+    // Reset to Wnd ID 1 as the current drawable is being closed
+    this.ActiveID = 1;
+    this.AWnd = this.gWIN[this.GetIndexForID(1)];
+  }
   
   this.changed = true;
 }
@@ -335,6 +340,38 @@ Renderer.gUSE = function(i) {
   }
   this.ActiveID = i;
   this.AWnd = this.gWIN[gID];
+}
+
+// Usage: gCOPY id%, x%, y%, width%, height%, mode%
+Renderer.gCOPY = function(i, x, y, w, h, m) {
+  var gID = this.GetIndexForID(i);
+  
+  if (gID == -1) {
+    wO('ERROR: gCOPY request out of bounds');
+	return;
+  }
+  
+  // Copy area from id% to current drawable depending on mode
+  if (m == 3)
+  {
+	  // Pure copy
+	  this.AWnd[11].drawImage(Renderer.gWIN[gID][10], x, y, w, h, this.gX(), this.gY(), w, h);
+  }
+  else if (m == 0)
+  {
+	  // Set 
+	  wO('TODO!');
+  }
+  else if (m == 1)
+  {
+	  // Clear
+	  wO('TODO!');
+  }
+  else if (m == 2)
+  {
+	  // Invert
+	  wO('TODO!');
+  }
 }
 
 // Usage: gORDER id%, position%
