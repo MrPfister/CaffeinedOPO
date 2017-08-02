@@ -168,6 +168,55 @@ opCodeFuncs.push(
   pc += 2;
 }],
 
+[0x18, function() { VAR_pEE_Arr_Val(2); }],
+[0x19, function() { VAR_pEE_Arr_Val(4); }],
+[0x1A, function() { VAR_pEE_Arr_Val(8); }],
+[0x1B, function() { 
+  // Get the array index
+  var arg1 = Stack.ppi16();
+
+  var EEn = i16(pB, pc + 1);
+  pc += 2;
+  
+  // Get the address of the global array address
+  var LL = getEEa(EEn);
+  
+  // Get the length of each string
+  var sL = DSF.m[LL - 1];
+  LL = LL + sL * (arg1 - 1);
+  
+  var val = CStr(DSF.m, LL);
+  wO('0x1B: PUSH+ the value of EE$(' + val + ') of String Array Index(' + arg1 + ') at Location (' + LL + ')');
+  // Push the value to the stack
+  Stack.ps(val);
+}],
+
+[0x1C, function() { VAR_pEE_Arr_ADDR(2); }],
+[0x1D, function() { VAR_pEE_Arr_ADDR(4); }],
+[0x1E, function() { VAR_pEE_Arr_ADDR(8); }],
+[0x1F, function() { 
+  // Get the array index
+  var arg1 = Stack.ppi16();
+  
+  var EEn = i16(pB, pc + 1);
+  pc += 2;
+
+  // Get the address of the global array address
+  var LL = getEEa(EEn);
+  
+  // Get the length of each string
+  var sL = DSF.m[LL - 1];
+  if (typeof sL === 'undefined') {
+	  sL = 0;
+  }
+  
+  LL = LL + sL * (arg1 - 1);
+  wO('0x1F PUSH= ADDR of EE$(' + EEn + ') of String Array Index(' + arg1 + ') with String Length (' + sL + ')');
+  
+  Stack.pu16(LL);
+}],
+
+
 // 0x28 - 0x2B PUSH+ VV+
 [0x28, function() {
   var vl = i16(pB, pc + 1);
@@ -208,6 +257,24 @@ opCodeFuncs.push(
 [0x7C, function() { VAR_CONV(0, 2); }],
 [0x7D, function() { VAR_CONV(1, 2); }],
 
+[0x9C, function() {
+  var val = Stack.ppi16();
+  var arg = Stack.ppi16();
+  wO('0x9C: POKEB pop%1 in location with address pop=2');
+  DSF.m[arg] = val;
+}],
+
+[0x18, function() {
+  var arg = Stack.ppi16();
+  wO('0x57 -> 0x18: PEEKB ' + arg);
+  
+  Stack.pi16(DSF.m[arg]);
+}, 0x57],
+
+[0x1F, function() {
+  wO('0x57 -> 0x42: push% ADDR pop= (address of a string)');
+}, 0x57],
+
 [0x42, function() {
   // Get the Value
   var val = Stack.ppf64();
@@ -241,11 +308,54 @@ function VAR_pEE_Val() {
 
 function VAR_pEE_ADDR() {
   var EEn = i16(pB, pc + 1);
-  wO('0x0C - 0x0F PUSH+ the address of EE+(' + EEn + ') - TODO');
+  wO('0x0C - 0x0F PUSH+ the address of EE+(' + EEn + ')');
   pc += 2;
 
   // Get the address of the global
   Stack.pu16(getEEa(EEn));
+}
+
+function VAR_pEE_Arr_ADDR(it) {
+  // Get the array index
+  var arg1 = Stack.ppi16();
+  
+  var EEn = i16(pB, pc + 1);
+  wO('0x1C - 0x1F PUSH= ADDR of EE+(' + EEn + ') at index: ' + arg1);
+  pc += 2;
+
+  // Get the address of the global array address
+  Stack.pu16(getEEa(EEn) + it * (arg1 - 1));
+}
+
+function VAR_pEE_Arr_Val(it) {
+  // Get the array index
+  var arg1 = Stack.ppi16();
+  
+  var EEn = i16(pB, pc + 1);
+  wO('0x18 - 0x1B PUSH+ the value of EE+(' + EEn + ') at index: ' + arg1);
+  pc += 2;
+
+  // Get the address of the global array address
+  var arg1 = getEEa(EEn) + it * (arg1 - 1);
+  
+  if (it == 2)
+  {
+	// Int16
+    var val = i16(DSF.m, arg1);
+    Stack.pi16(val);
+  }
+  else if (it == 4)
+  {
+	// Int32
+    var val = i32(DSF.m, arg1);
+    Stack.pi32(val);
+  }
+  else if (it == 8)
+  {
+	// Float
+    var val = f64(DSF.m, arg1);
+    Stack.pf64(val);
+  }
 }
 
 function VAR_Arr_ADDR(it) {
@@ -261,7 +371,7 @@ function VAR_Arr_ADDR(it) {
 }
 
 function VAR_CONV(it, ot) {
-  var a = Stack.pa([it]);
+  var a = Stack.pa([it]); // Pop value of type it
   wO('0x78 -0x7D: PUSH value of POP(' + a[0] + ') TYPE CONVERSION');
-  Stack.pt(a[0], ot); 
+  Stack.pt(a[0], ot); // Push value of type ot
 }

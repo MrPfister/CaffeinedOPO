@@ -13,7 +13,6 @@ opCodeFuncs.push(
   wO('0x57 0x00: ADDR ' + arg);
   Stack.pi16(arg);
 }, 0x57]
-
 );
 
 function MEM_STR(cI) {
@@ -24,5 +23,5 @@ function MEM_STR(cI) {
   var addr = Stack.ppu16();
       
   wO('0x8' + (4 + cI) + ': Store bytes [' + v + '] in location ' + addr + ' -> ' + (addr + v.length - 1) );
-  DSF.set(addr ,v);
+  DSF.set(addr, v);
 }

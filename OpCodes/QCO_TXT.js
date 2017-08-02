@@ -2,15 +2,14 @@
 
 opCodeFuncs.push(
 
-[0x20, function() {
+[0x14, function() {
   var arg = Stack.pps();
     
-  // Convert to a string.
   var res = arg.length;
-  wO('0x57 -> 0x20: LEN(' + arg + ') = "' + res + '"');
+  wO('0x57 -> 0x14: LEN(' + arg + ') = "' + res + '"');
       
   // Push the value to the stack
-  Stack.ps(res);
+  Stack.pi16(res);
 }, 0x57],
 
 [0xC0, function() {
@@ -75,5 +74,25 @@ opCodeFuncs.push(
       
   // Push the value to the stack
   Stack.ps(res);
+}, 0x57],
+
+[0xCC, function() {
+  var argY = Stack.ppi16();
+  var argX = Stack.ppi16();
+  var argS = Stack.pps();
+  wO('0x57 -> 0xCC: MID$(' + argS + ', ' + argX + ', ' + argY + ')');
+  
+  Stack.ps(argS.substring(argX - 1, argY));
+}, 0x57],
+
+[0xD0, function() {
+  var arg1 = Stack.ppi16();
+  var arg2 = Stack.pps();
+  var nStr = "";
+  for (var i=0; i<arg1; i++) {
+    nStr+=arg2;
+  }
+  wO('0x57 0xD0: REPT$ "' + arg2 + '", ' + arg1 + ' = "' + nStr + '"');
+  Stack.ps(nStr);
 }, 0x57]
 );

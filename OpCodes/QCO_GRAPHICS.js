@@ -2,6 +2,24 @@
 
 opCodeFuncs.push(
 
+[0xC5, function() {
+  var arg = pB[++pc];
+  wO('0xC5: gSAVEBIT');
+  
+  if (arg == 0)
+  {
+	  // 1 Argument version
+	  Stack.ppd();
+  }
+  else if (arg == 1)
+  {
+	  // 3 Argument version
+	  Stack.ppd();
+	  Stack.ppd();
+	  Stack.ppd();
+  }
+}],
+
 [0xC6, function() {
   var arg = Stack.ppi16();
   wO('0xC6: gCLOSE ' + arg);
@@ -59,8 +77,8 @@ opCodeFuncs.push(
 }],
 
 [0xD4, function() {
-  var arg = Stack.ppi16();
-  wO('0xD4: gPRINT ' + arg);
+  var arg1 = Stack.ppi16();
+  wO('0xD4: gPRINT ' + arg1);
   Renderer.gPRINT(arg1);
 }],
 
@@ -109,6 +127,18 @@ opCodeFuncs.push(
   Renderer.gFILL(width, height, fillMode);
 }],
 
+[0xE1, function() {
+  var argMode = Stack.ppi16();
+  var height = Stack.ppi16();
+  var width = Stack.ppi16();
+  var argY = Stack.ppi16();
+  var argX = Stack.ppi16();
+  var argID = Stack.ppi16();
+  
+  wO('0xE3: gCOPY ' + argID + ', ' + argX + ', ' + argY + ', ' + width + ', ' + height + ', ' + argMode);
+  Renderer.gCOPY(argID, argX, argY, width, height, argMode);
+}],
+
 [0xE3, function() {
   var arg = pB[++pc];
   wO('0xE3: gUPDATE ' + arg);
@@ -132,6 +162,14 @@ opCodeFuncs.push(
   Renderer.gBORDER(args);
 }],
 
+[0xFC, function() {
+  var arg = pB[++pc];
+  wO('0xFC: gIPRINT ' + arg + ' - TODO');
+  for (var i = 0; i < arg + 1; i++) {
+    Stack.ppd();
+  }
+}],
+
 [0x26, function() {
   var args = [];
   for (var i = 0; i < 5; i++) {
@@ -150,6 +188,9 @@ opCodeFuncs.push(
   for (var i = 0; i < arg; i++) {
     args.push(Stack.ppi16());
   }
+  
+  // Create a temporary blank bitmap instead.
+  Stack.pi16(Renderer.gCREATE(0, 0, 480, 160, 0, 0));
 }, 0x57],
 
 [0x2A, function() {
@@ -168,12 +209,12 @@ opCodeFuncs.push(
 }, 0x57],
 
 [0x2E, function() {
-  wO('0x57 -> 0x2E: gWIDTH');
+  wO('0x57 -> 0x2E: gWIDTH: ' + Renderer.gWIDTH());
   Stack.pi16(Renderer.gWIDTH());
 }, 0x57],
 
 [0x2F, function() {
-  wO('0x57 -> 0x2F: gHEIGHT');
+  wO('0x57 -> 0x2F: gHEIGHT: ' + Renderer.gHEIGHT());
   Stack.pi16(Renderer.gHEIGHT());
 }, 0x57],
 
@@ -224,6 +265,24 @@ opCodeFuncs.push(
   Renderer.gUSE(1);
   Renderer.gCLS();
   Renderer.gUSE(curID);
+}, 0xFF],
+
+[0x04, function() {
+  Stack.ppd();
+  Stack.ppd();
+  
+  wO('0xFF -> 0x04: FONT - Ignored');
+}, 0xFF],
+
+[0x0F, function() {
+  
+  wO('0xFF -> 0x0F: gBUTTON - Ignored');
+  Stack.ppd();
+  Stack.ppd();
+  Stack.ppd();
+  Stack.ppd();
+  Stack.ppd();
+  
 }, 0xFF]
 
 );

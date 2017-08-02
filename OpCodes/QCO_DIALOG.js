@@ -49,7 +49,11 @@ opCodeFuncs.push(
 }, 0xED],
 
 [0x01, function() {
-  wO('0xED -> 0x01: dCHOICE - todo');
+  var arg1 = Stack.pps();
+  var arg2 = Stack.pps();
+  var arg3 = Stack.ppu16();
+  wO('0xED -> 0x01: dCHOICE ADDR(' + arg3 + '), "' + arg2 +'", "' + arg1 +'"');
+  DialogManager.dCHOICE(arg3, arg2, arg1);
 }, 0xED],
 
 [0x02, function() {
@@ -77,7 +81,7 @@ opCodeFuncs.push(
   var arg1 = Stack.pps();
   var arg2 = Stack.ppu16();
   wO('0xED -> 0x06: dEDIT ADDR(' + arg2 + '), "' + arg1 + '"');
-  DialogManager.dEDIT(arg2, arg1, -1);
+  DialogManager.dEDIT(arg2, arg1, -1, false);
 }, 0xED],
 
 [0x07, function() {
@@ -85,11 +89,14 @@ opCodeFuncs.push(
   var arg2 = Stack.pps();
   var arg3 = Stack.ppu16();
   wO('0xED -> 0x06: dEDIT ADDR(' + arg3 + '), "' + arg2 + '", ' + arg1);
-  DialogManager.dEDIT(arg3, arg2, arg1);
+  DialogManager.dEDIT(arg3, arg2, arg1, false);
 }, 0xED],
 
 [0x08, function() {
-  wO('0xED -> 0x08: dXINPUT - todo');
+  var arg1 = Stack.pps();
+  var arg2 = Stack.ppu16();
+  wO('0xED -> 0x08: dXINPUT ADDR(' + arg2 + '), "' + arg1 + '"');
+  DialogManager.dEDIT(arg2, arg1, -1, true);
 }, 0xED],
 
 [0x09, function() {

@@ -23,6 +23,14 @@ opCodeFuncs.push(
 [0x59, function() { ARTH_POW(1); }],
 [0x5A, function() { ARTH_POW(2); }],
 
+[0x5C, function() { ARTH_AND(0); }],
+[0x5D, function() { ARTH_AND(1); }],
+[0x5E, function() { ARTH_AND(2); }],
+
+[0x60, function() { ARTH_OR(0); }],
+[0x61, function() { ARTH_OR(1); }],
+[0x62, function() { ARTH_OR(2); }],
+
 [0x64, function() { ARTH_NOT(0); }],
 [0x65, function() { ARTH_NOT(1); }],
 [0x66, function() { ARTH_NOT(2); }],
@@ -35,7 +43,6 @@ opCodeFuncs.push(
   Stack.ppd();
   wO('0xB9: RANDOMIZE');
 }],
-
 
 [0x90, function() { 
   var arg = Stack.ppf64();
@@ -92,4 +99,20 @@ function ARTH_NOT(v) {
   var a = Stack.pa([v]);
   wO('0x' + (64 + v) + ': push% NOT pop%(' + a[0] + ')');
   Stack.pt(~a[0], v); 
+}
+
+// AND binary operator
+function ARTH_AND(v) {
+  var a = Stack.pa([v]);
+  var b = Stack.pa([v]);
+  wO('0x5C - 0x5E: push% pop2% AND pop1%');
+  Stack.pt(a & b, v); 
+}
+
+// OR binary operator
+function ARTH_OR(v) {
+  var a = Stack.pa([v]);
+  var b = Stack.pa([v]);
+  wO('0x60 - 0x62: push% pop2% OR pop1%');
+  Stack.pt(a | b, v); 
 }

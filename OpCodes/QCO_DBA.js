@@ -3,24 +3,28 @@ opCodeFuncs.push(
 [0x20, function() {
   // Extract the DB Indexer
   var arg = pB[++pc];
+  Stack.ppd();
 
   wO('0x20: push+ the value of field pop$+ of data file ' + arg + ' - Todo');
 }],
 [0x21, function() {
   // Extract the DB Indexer
   var arg = pB[++pc];
+  Stack.ppd();
 
   wO('0x21: push+ the value of field pop$+ of data file ' + arg + ' - Todo');
 }],
 [0x22, function() {
   // Extract the DB Indexer
   var arg = pB[++pc];
+  Stack.ppd();
 
   wO('0x22: push+ the value of field pop$+ of data file ' + arg + ' - Todo');
 }],
 [0x23, function() {
   // Extract the DB Indexer
   var arg = pB[++pc];
+  Stack.ppd();
 
   wO('0x23: push+ the value of field pop$+ of data file ' + arg + ' - Todo');
 }],
@@ -28,12 +32,27 @@ opCodeFuncs.push(
 [0x25, function() {
   // Extract the DB Indexer
   var arg = pB[++pc];
+  Stack.ppd();
 
   wO('0x25: push= the address of field pop$+ of data file ' + arg + ' - Todo');
 }],
 
+[0x27, function() {
+  // Extract the DB Indexer
+  var arg = pB[++pc];
+  Stack.ppd();
+
+  wO('0x27: push= the address of field pop$+ of data file ' + arg + ' - Todo');
+}],
+
 [0xA1, function() {
   wO('0xA1: CLOSE - Todo');
+}],
+
+[0xA3, function() {
+  Stack.ppd();
+  Stack.ppd();
+  wO('0xA3: COMPRESS - Todo');
 }],
 
 [0xB4, function() {
